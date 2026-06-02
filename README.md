@@ -123,7 +123,7 @@ Runs a full AI-backed quantitative analysis pipeline on a set of target tokens. 
 
 ---
 
-#### 🔧 Tool (UI) — `advanced_crypto_quant_pipeline`
+####  Tool (UI) — `advanced_crypto_quant_pipeline`
 
 ```
 quant_advanced_crypto_quant_pipeline(coin_ids: str, apply_mitigation: bool = False) → PrefabApp
@@ -239,7 +239,7 @@ Use `otel_launcher.py` when you have an OTLP collector running and want full dis
 
 ---
 
-## 📡 Available MCP Capabilities (Client View)
+##  Available MCP Capabilities (Client View)
 
 Once connected, the following capabilities are exposed to the MCP client:
 
