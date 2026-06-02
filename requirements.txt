@@ -1,0 +1,25 @@
+# ==============================================================================
+# Core MCP Framework & UI Engine
+# ==============================================================================
+fastmcp>=0.4.1
+prefab-ui>=0.1.0
+httpx>=0.27.0
+python-dotenv>=1.0.1
+pydantic>=2.10.0
+
+# ==============================================================================
+# OpenTelemetry & Observability Ecosystem
+# ==============================================================================
+opentelemetry-api>=1.25.0
+opentelemetry-sdk>=1.25.0
+opentelemetry-distro>=0.46b0
+opentelemetry-exporter-otlp>=1.25.0
+opentelemetry-instrumentation-fastapi>=0.46b0
+opentelemetry-instrumentation-httpx>=0.46b0
+
+# ==============================================================================
+# Production Scaling & Resilience Tools (Next Steps)
+# ==============================================================================
+uvicorn>=0.30.0          # ASGI production web server
+redis>=5.0.0            # Distributed asynchronous caching layer
+tenacity>=8.4.0         # Fault-tolerant circuit breaker & retries

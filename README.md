@@ -54,8 +54,7 @@ enterprise-crypto-mcp/
 │
 ├── .env                # Environment variables (gitignored)
 ├── .gitignore
-└── requirements.txt    # (add your own if not present)
-```
+└── requirements.txt    
 
 ---
 
