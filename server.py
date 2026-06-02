@@ -5,6 +5,8 @@ import httpx
 from fastmcp import FastMCP, Context
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
+from prefab_ui.app import PrefabApp
+from prefab_ui.components import Column, Heading, Text, Badge, Row, Separator
 
 # Boot and inject environment variables from the local .env file
 load_dotenv()
@@ -142,8 +144,8 @@ class MarketSignal(BaseModel):
     synthesis: str = Field(description="Exactly a 1-sentence institutional-grade executive overview statement summarizing the play")
 
 
-@mcp.tool()
-async def advanced_crypto_quant_pipeline(coin_ids: str, ctx: Context) -> str:
+@mcp.tool(app=True)
+async def advanced_crypto_quant_pipeline(coin_ids: str, ctx: Context) -> PrefabApp:
     """
     An enterprise-grade orchestration pipeline demonstrating Async execution, 
     Multi-Asset parsing loops, User Elicitation, and Pydantic-validated Structured LLM Generation.
@@ -271,16 +273,45 @@ async def advanced_crypto_quant_pipeline(coin_ids: str, ctx: Context) -> str:
     
     run_count = (await ctx.get_state("pipeline_runs") or 0) + 1
     await ctx.set_state("pipeline_runs", run_count)
-    
     await ctx.info(f"Pipeline processing complete. Operational Run Tracker adjusted to: {run_count}")
     
-    return (
-        f"## ENTERPRISE QUANT PIPELINE RUN #{run_count} METRICS\n"
-        f"**Target Array Range Request:** `{coin_ids}`\n"
-        f"**Enforced Risk Overlays:** `{risk_mitigation}`\n"
-        f"\n---\n"
-        f"{ai_dashboard_output}"
-    )
+    # Change 2: Build a dynamic UI instead of returning a string
+    with Column(gap=4, css_class="p-6") as view:
+        Heading(f" Enterprise Quant Pipeline #{run_count}", level=2)
+        
+        with Row(gap=2, align="center"):
+            Text("Target Range:", weight="bold")
+            Badge(coin_ids, variant="info")
+            Text("Enforced Risk Overlays:", weight="bold")
+            Badge(str(risk_mitigation), variant="warning" if risk_mitigation else "destructive")
+        
+        Separator()
+        
+        Heading(" Validation Matrix", level=3)
+        
+        with Row(gap=4):
+            with Column(gap=1):
+                Text("Aggregate Sentiment", weight="bold")
+                Badge(validated_signal.sentiment)
+            with Column(gap=1):
+                Text("System Risk Rating", weight="bold")
+                Text(f"{validated_signal.risk_score}/10")
+        
+        with Column(gap=1):
+            Text("Target Ingress Protocol (Entry):", weight="bold")
+            Text(validated_signal.entry_target)
+        
+        with Column(gap=1):
+            Text("Calculated Contingency Plan (Stop-Loss):", weight="bold")
+            Text(validated_signal.stop_loss)
+        
+        Separator()
+        
+        Heading("Executive Synthesis", level=4)
+        Text(validated_signal.synthesis, italic=True)
+
+    return PrefabApp(view=view)
+    
 
 
 if __name__ == "__main__":
