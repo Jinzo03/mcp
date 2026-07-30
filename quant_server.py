@@ -1,10 +1,14 @@
 import os
 import httpx
+import logging
 from fastmcp import FastMCP, Context
 from prefab_ui.app import PrefabApp
 from prefab_ui.components import Column, Heading, Text, Badge, Row, Separator
 from pydantic import BaseModel, Field
 from fastmcp.telemetry import get_tracer
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 # Import the functional tool directly to preserve internal Telemetry Spans safely
 from data_server import get_crypto_price
@@ -48,24 +52,83 @@ async def advanced_crypto_quant_pipeline(coin_ids: str, ctx: Context, apply_miti
         await ctx.report_progress(3, 3, "Executing structural evaluation arrays...")
         gemini_key = os.getenv("GEMINI_API_KEY")
         
+        # Validate required API key
+        if not gemini_key:
+            logger.error("GEMINI_API_KEY environment variable is not set")
+            raise ValueError("GEMINI_API_KEY environment variable is required but not set")
+        
         prompt_msg = (
             f"Context Profile Matrix:\n{matrix_str}\n"
             f"Risk Overlays Active: {risk_mitigation}\n"
             f"Output exact JSON parsing schema containing fields matching MarketSignal specs."
         )
         
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={gemini_key}"
+        # Use headers for API key to avoid exposing it in URL/logs
+        url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+        headers = {
+            "Content-Type": "application/json",
+            "x-goog-api-key": gemini_key
+        }
         payload = {
             "contents": [{"parts": [{"text": prompt_msg}]}],
             "generationConfig": {"responseMimeType": "application/json"}
         }
         
-        async with httpx.AsyncClient() as client:
-            res = await client.post(url, json=payload, timeout=15.0)
-            res_data = res.json()
-            
-        raw_json = res_data['candidates'][0]['content']['parts'][0]['text'].strip()
-        validated_signal = MarketSignal.model_validate_json(raw_json)
+        try:
+            async with httpx.AsyncClient() as client:
+                res = await client.post(url, json=payload, headers=headers, timeout=15.0)
+                res.raise_for_status()  # Raise exception for HTTP errors
+                res_data = res.json()
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Gemini API returned HTTP error: {e.response.status_code}")
+            span.set_attribute("error.message", f"HTTP {e.response.status_code}")
+            if e.response.status_code == 401:
+                raise ValueError("Gemini API authentication failed - check your API key")
+            elif e.response.status_code == 403:
+                raise ValueError("Gemini API access forbidden - verify API key permissions")
+            elif e.response.status_code == 429:
+                raise ValueError("Gemini API rate limit exceeded - please retry later")
+            else:
+                raise ValueError(f"Gemini API returned status code {e.response.status_code}")
+        except httpx.RequestError as e:
+            logger.error(f"Gemini API request failed: {e}")
+            span.set_attribute("error.message", str(e))
+            raise ValueError(f"Failed to connect to Gemini API: {str(e)}")
+        except Exception as e:
+            logger.error(f"Unexpected error calling Gemini API: {e}")
+            span.set_attribute("error.message", str(e))
+            raise ValueError(f"Unexpected error calling Gemini API: {str(e)}")
+        
+        # Validate response structure before accessing nested keys
+        if not isinstance(res_data, dict):
+            logger.error(f"Invalid Gemini API response format: {res_data}")
+            raise ValueError("Invalid response format from Gemini API")
+        
+        candidates = res_data.get('candidates', [])
+        if not candidates or not isinstance(candidates, list) or len(candidates) == 0:
+            logger.error(f"No candidates in Gemini API response: {res_data}")
+            raise ValueError("No candidates returned from Gemini API")
+        
+        content = candidates[0].get('content', {})
+        if not isinstance(content, dict):
+            logger.error(f"Invalid content structure in Gemini API response: {content}")
+            raise ValueError("Invalid content structure from Gemini API")
+        
+        parts = content.get('parts', [])
+        if not parts or not isinstance(parts, list) or len(parts) == 0:
+            logger.error(f"No parts in Gemini API response content: {content}")
+            raise ValueError("No parts returned in Gemini API response")
+        
+        raw_json = parts[0].get('text', '').strip()
+        if not raw_json:
+            logger.error("Empty text in Gemini API response")
+            raise ValueError("Empty response text from Gemini API")
+        
+        try:
+            validated_signal = MarketSignal.model_validate_json(raw_json)
+        except Exception as e:
+            logger.error(f"Failed to validate Gemini API response as MarketSignal: {e}")
+            raise ValueError(f"Invalid JSON response from Gemini API: {str(e)}")
 
         # Assemble the UI View object
         with Column(gap=4, css_class="p-6") as view:
