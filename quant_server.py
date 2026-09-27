@@ -33,7 +33,7 @@ async def advanced_crypto_quant_pipeline(coin_ids: str, ctx: Context, apply_miti
     """
     tracer = get_tracer()
     
-    with tracer.start_as_current_span("orchestration_pipeline_root"):
+    with tracer.start_as_current_span("orchestration_pipeline_root") as span:
         await ctx.report_progress(1, 3, "Compiling multi-server telemetry loops...")
         
         targets = [coin.strip().lower() for coin in coin_ids.split(",") if coin.strip()]
@@ -58,9 +58,15 @@ async def advanced_crypto_quant_pipeline(coin_ids: str, ctx: Context, apply_miti
             raise ValueError("GEMINI_API_KEY environment variable is required but not set")
         
         prompt_msg = (
+            "Analyze the crypto market data below and return exactly one JSON object. "
+            "Do not return a dashboard layout, assets array, markdown, or extra fields. "
+            "The object must have these exact keys: sentiment (Bullish, Bearish, or Neutral), "
+            "entry_target (string), stop_loss (string), risk_score (integer from 1 to 10), "
+            "and synthesis (exactly one sentence).\n"
             f"Context Profile Matrix:\n{matrix_str}\n"
             f"Risk Overlays Active: {risk_mitigation}\n"
-            f"Output exact JSON parsing schema containing fields matching MarketSignal specs."
+            'Required shape: {"sentiment":"Neutral","entry_target":"...",'
+            '"stop_loss":"...","risk_score":5,"synthesis":"..."}'
         )
         
         # Use headers for API key to avoid exposing it in URL/logs
@@ -71,7 +77,20 @@ async def advanced_crypto_quant_pipeline(coin_ids: str, ctx: Context, apply_miti
         }
         payload = {
             "contents": [{"parts": [{"text": prompt_msg}]}],
-            "generationConfig": {"responseMimeType": "application/json"}
+            "generationConfig": {
+                "responseMimeType": "application/json",
+                "responseSchema": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "sentiment": {"type": "STRING", "enum": ["Bullish", "Bearish", "Neutral"]},
+                        "entry_target": {"type": "STRING"},
+                        "stop_loss": {"type": "STRING"},
+                        "risk_score": {"type": "INTEGER"},
+                        "synthesis": {"type": "STRING"}
+                    },
+                    "required": ["sentiment", "entry_target", "stop_loss", "risk_score", "synthesis"]
+                }
+            }
         }
         
         try:
